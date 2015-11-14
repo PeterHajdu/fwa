@@ -9,6 +9,7 @@ void usage() {
 int main(int argc, char *argv[]) {
 	if (argc < 2)
 		usage();
-	printf("%s\n", argv[1]);
+
+	printf("%s\n%s\n", argv[1], argv[2]);
 	return 0;
 }

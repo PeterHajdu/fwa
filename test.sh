@@ -19,14 +19,20 @@ test_that_it_prints_out_usage_information_without_files_to_watch () {
 }
 
 test_that_it_prints_out_a_single_files_name_if_it_is_changed () {
-	file_to_watch=`mktemp` || exit 1
-	expected_output=`mktemp` || exit 1
-	echo $file_to_watch > $expected_output
-	run_with_parameters_in_the_background $file_to_watch
-	echo "some text" > $file_to_watch
+	changed_file=`mktemp` || exit 1
+	unchanged_file=`mktemp` || exit 1
+	run_with_parameters_in_the_background $unchanged_file $changed_file
+	echo "some text" > $changed_file
 	sleep 1
-	diff $expected_output $output_file
-	return $?
+	if grep $unchanged_file $output_file; then
+		return 1
+	fi
+
+	if grep $changed_file $output_file; then
+		return 0
+	fi
+
+	return 1
 }
 
 
