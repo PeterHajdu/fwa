@@ -53,7 +53,7 @@ struct kevent* allocate_event_memory(size_t number_of_files)
 			NULL,
 			number_of_files,
 			sizeof( struct kevent ));
-	if ( kevent == NULL )
+	if ( ptr == NULL )
 		err(2, "Unable to allocate event memory.");
 	return ptr;
 }
