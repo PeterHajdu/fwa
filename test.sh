@@ -62,7 +62,25 @@ test_that_it_prints_out_each_changed_files_name () {
 	return 1
 }
 
+test_that_it_prints_out_fast_file_changes_only_once () {
+	file_1=`mktemp` || exit 1
+	run_with_parameters_in_the_background "$file_1"
+	echo "some test" > $file_1
+	echo "some test" > $file_1
+	sleep 1
+	kill_background_fwa
+	number_of_changes=`grep $file_1 $output_file | wc -l`
+	echo "Number of changes: $number_of_changes"
+	if [ $number_of_changes -lt 2 ]; then
+		return 0
+	fi
+
+	echo "Changed file was reported more than once."
+	return 1
+}
+
 test_that_it_prints_out_usage_information_without_files_to_watch &&
 test_that_it_prints_out_a_single_files_name_if_it_is_changed &&
-test_that_it_prints_out_each_changed_files_name
+test_that_it_prints_out_each_changed_files_name &&
+test_that_it_prints_out_fast_file_changes_only_once
 

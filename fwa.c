@@ -58,6 +58,27 @@ struct kevent* allocate_event_memory(size_t number_of_files)
 	return ptr;
 }
 
+struct event_descriptor {
+	const char* filename;
+	int numbers_triggered;
+};
+
+struct event_descriptor* create_event_descriptor( const char* filename )
+{
+	struct event_descriptor* descriptor =
+		malloc( sizeof( struct event_descriptor ) );
+	if ( descriptor == NULL )
+		err(4, "Unable to allocate memory for descriptor.");
+	descriptor->filename=filename;
+	descriptor->numbers_triggered=0;
+	return descriptor;
+}
+
+void mark_event( struct event_descriptor* descriptor )
+{
+	descriptor->numbers_triggered++;
+}
+
 size_t set_up_events_to_watch(
 		struct kevent *events,
 		size_t number_of_files,
@@ -88,7 +109,7 @@ size_t set_up_events_to_watch(
 			EV_ADD | EV_CLEAR,
 			vnode_events,
 			0,
-			filename );
+			create_event_descriptor( filename ) );
 		event_slot++;
 	}
 	return event_slot;
@@ -100,11 +121,28 @@ void set_output_buffer()
   setvbuf(stdout, line_buffer, _IOLBF, sizeof(line_buffer));
 }
 
+void report_and_cleanup_events( struct kevent* monitored_events, size_t number_of_events )
+{
+	size_t i = 0;
+	for( ; i < number_of_events; i++ )
+	{
+		struct event_descriptor* descriptor =
+			monitored_events[i].udata;
+		if ( descriptor->numbers_triggered == 0 )
+			continue;
+		printf( "%s\n", descriptor->filename );
+		descriptor->numbers_triggered = 0;
+	}
+}
+
 void handle_events(
 		int queue,
 		struct kevent* events_to_monitor,
 		size_t number_of_events ) {
 	struct kevent event_data[1];
+	struct timespec timeout;
+	timeout.tv_sec=0;
+	timeout.tv_nsec=500000000;
 	while ( 1 ) {
 		int event_count = kevent(
 				queue,
@@ -112,11 +150,15 @@ void handle_events(
 				number_of_events,
 				event_data,
 				1,
-				NULL );
+				&timeout );
 		if( event_count < 0 )
 			err( 3, "Error occured while waiting for events." );
-		if( event_count > 0 )
-			printf( "%s\n", (const char*)event_data[0].udata );
+		if( event_count > 0 ) {
+			mark_event( event_data[0].udata );
+			continue;
+		}
+
+		report_and_cleanup_events( events_to_monitor, number_of_events );
 	}
 }
 

@@ -1,7 +1,7 @@
 SOURCES=fwa.c
 EXECUTABLE=fwa
 TEST=test.sh
-CFLAGS=-Wall -Werror -pedantic
+CFLAGS=-Wall -Werror -pedantic -g
 
 $(EXECUTABLE): $(SOURCES)
 	$(CC) $(CFLAGS) $(SOURCES) -o $(EXECUTABLE)
