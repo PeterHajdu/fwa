@@ -105,16 +105,18 @@ void handle_events(
 		struct kevent* events_to_monitor,
 		size_t number_of_events ) {
 	struct kevent event_data[1];
-	int event_count = kevent(
-			queue,
-			events_to_monitor,
-			number_of_events,
-			event_data,
-			1,
-			NULL );
-	if( event_count < 0 )
-		err( 3, "Error occured while waiting for events." );
-	if( event_count > 0 )
-		printf( "%s\n", (const char*)event_data[0].udata );
+	while ( 1 ) {
+		int event_count = kevent(
+				queue,
+				events_to_monitor,
+				number_of_events,
+				event_data,
+				1,
+				NULL );
+		if( event_count < 0 )
+			err( 3, "Error occured while waiting for events." );
+		if( event_count > 0 )
+			printf( "%s\n", (const char*)event_data[0].udata );
+	}
 }
 
