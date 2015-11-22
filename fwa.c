@@ -47,8 +47,7 @@ size_t get_number_of_files(int argc) {
 	return number_of_files;
 }
 
-struct kevent* allocate_event_memory(size_t number_of_files)
-{
+struct kevent* allocate_event_memory(size_t number_of_files) {
 	struct kevent * const ptr = reallocarray(
 			NULL,
 			number_of_files,
@@ -63,8 +62,7 @@ struct event_descriptor {
 	int numbers_triggered;
 };
 
-struct event_descriptor* create_event_descriptor( const char* filename )
-{
+struct event_descriptor* create_event_descriptor( const char* filename ) {
 	struct event_descriptor* descriptor =
 		malloc( sizeof( struct event_descriptor ) );
 	if ( descriptor == NULL )
@@ -74,16 +72,11 @@ struct event_descriptor* create_event_descriptor( const char* filename )
 	return descriptor;
 }
 
-void mark_event( struct event_descriptor* descriptor )
-{
+void mark_event( struct event_descriptor* descriptor ) {
 	descriptor->numbers_triggered++;
 }
 
-size_t set_up_events_to_watch(
-		struct kevent *events,
-		size_t number_of_files,
-		char* argv[] )
-{
+size_t set_up_events_to_watch( struct kevent *events, size_t number_of_files, char* argv[] ) {
 	static const unsigned int vnode_events =
 		NOTE_DELETE |
 		NOTE_WRITE |
@@ -94,8 +87,7 @@ size_t set_up_events_to_watch(
 		NOTE_REVOKE;
 	int i = 0;
 	int event_slot = 0;
-	for( ; i < number_of_files; i++ )
-	{
+	for( ; i < number_of_files; i++ ) {
 		char* const filename = argv[i+1];
 		const int event_fd = open( filename, O_RDONLY );
 		if (event_fd<0) {
@@ -115,14 +107,12 @@ size_t set_up_events_to_watch(
 	return event_slot;
 }
 
-void set_output_buffer()
-{
+void set_output_buffer() {
   static char line_buffer[ 512 ];
   setvbuf(stdout, line_buffer, _IOLBF, sizeof(line_buffer));
 }
 
-void report_and_cleanup_events( struct kevent* monitored_events, size_t number_of_events )
-{
+void report_and_cleanup_events( struct kevent* monitored_events, size_t number_of_events ) {
 	size_t i = 0;
 	for( ; i < number_of_events; i++ )
 	{
@@ -135,10 +125,7 @@ void report_and_cleanup_events( struct kevent* monitored_events, size_t number_o
 	}
 }
 
-void handle_events(
-		int queue,
-		struct kevent* events_to_monitor,
-		size_t number_of_events ) {
+void handle_events( int queue, struct kevent* events_to_monitor, size_t number_of_events ) {
 	struct kevent event_data[1];
 	struct timespec timeout;
 	timeout.tv_sec=0;
