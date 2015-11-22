@@ -77,7 +77,7 @@ void mark_event( struct event_descriptor* descriptor ) {
 }
 
 size_t set_up_events_to_watch( struct kevent *events, size_t number_of_files, char* argv[] ) {
-	static const unsigned int vnode_events =
+	const unsigned int vnode_events =
 		NOTE_DELETE |
 		NOTE_WRITE |
 		NOTE_EXTEND |
@@ -90,10 +90,8 @@ size_t set_up_events_to_watch( struct kevent *events, size_t number_of_files, ch
 	for( ; i < number_of_files; i++ ) {
 		char* const filename = argv[i+1];
 		const int event_fd = open( filename, O_RDONLY );
-		if (event_fd<0) {
-			fprintf( stderr, "Unable to open file: %s\n", filename );
-			continue;
-		}
+		if (event_fd<0)
+			err( 5, "Unable to open file: %s", filename );
 		EV_SET(
 			&events[event_slot],
 			event_fd,

@@ -20,6 +20,12 @@ run_with_parameters () {
 	return $?
 }
 
+test_that_it_stops_if_its_unable_to_open_a_file () {
+	existing_file=`mktemp` || exit 1
+	run_with_parameters "$existing_file definitely_not_existing_file"
+	return 0
+}
+
 test_that_it_prints_out_usage_information_without_files_to_watch () {
 	run_with_parameters
 	grep -i usage $output_file
