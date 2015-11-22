@@ -34,16 +34,14 @@
 #include <string.h>
 
 void usage();
-int create_queue();
 size_t parse_options(int, char*[]);
 struct kevent* allocate_event_memory(size_t);
 size_t set_up_events_to_watch(struct kevent *, size_t, char*[]);
 void set_output_buffer();
-void handle_events(int, struct kevent*, size_t);
+void handle_events(struct kevent*, size_t);
 
 int main(int argc, char **argv) {
 	size_t number_of_files = 0;
-	int queue = 0;
 	struct kevent *events_to_monitor = NULL;
 
 	if (pledge("stdio rpath", NULL) == -1)
@@ -57,8 +55,7 @@ int main(int argc, char **argv) {
 	if (pledge("stdio", NULL) == -1)
 		err(7, "pledge");
 
-	queue = create_queue();
-	handle_events(queue, events_to_monitor, number_of_files);
+	handle_events(events_to_monitor, number_of_files);
 	return 0;
 }
 
@@ -68,13 +65,6 @@ void usage() {
 		"\noptions:\n"
 		"\t-h --help\tPrint out this message.\n");
 	exit(1);
-}
-
-int create_queue() {
-	const int queue = kqueue();
-	if (queue < 0)
-		err(1, "Unable to create kernel queue." );
-	return queue;
 }
 
 size_t parse_options(int argc, char* argv[]) {
@@ -163,7 +153,15 @@ void report_and_cleanup_events(struct kevent* monitored_events, size_t number_of
 	}
 }
 
-void handle_events(int queue, struct kevent* events_to_monitor, size_t number_of_events) {
+int create_queue() {
+	const int queue = kqueue();
+	if (queue < 0)
+		err(1, "Unable to create kernel queue." );
+	return queue;
+}
+
+void handle_events(struct kevent* events_to_monitor, size_t number_of_events) {
+	int queue = create_queue();
 	struct kevent event_data[1];
 	struct timespec timeout;
 	timeout.tv_sec=0;
