@@ -42,16 +42,23 @@ void set_output_buffer();
 void handle_events(int, struct kevent*, size_t);
 
 int main(int argc, char **argv) {
-	const size_t number_of_files = parse_options(argc, argv);
-	const int queue = create_queue();
-	struct kevent *events_to_monitor = allocate_event_memory(
-			number_of_files);
-	const size_t number_of_events = set_up_events_to_watch(
-			events_to_monitor,
-			number_of_files,
-			argv);
+	size_t number_of_files = 0;
+	int queue = 0;
+	struct kevent *events_to_monitor = NULL;
+
+	if (pledge("stdio rpath", NULL) == -1)
+		err(6, "pledge");
+
 	set_output_buffer();
-	handle_events(queue, events_to_monitor, number_of_events);
+	number_of_files = parse_options(argc, argv);
+	events_to_monitor = allocate_event_memory(number_of_files);
+	number_of_files = set_up_events_to_watch(events_to_monitor, number_of_files, argv);
+
+	if (pledge("stdio", NULL) == -1)
+		err(7, "pledge");
+
+	queue = create_queue();
+	handle_events(queue, events_to_monitor, number_of_files);
 	return 0;
 }
 
@@ -72,8 +79,6 @@ int create_queue() {
 
 size_t parse_options(int argc, char* argv[]) {
 	size_t number_of_files = argc - 1;
-	if (pledge("stdio rpath", NULL) == -1)
-		err(6, "pledge");
 	if (argc < 2)
 		usage();
 	if (0 == strncmp(argv[1], "-h", 2) || 0 == strncmp(argv[1], "--help", 6))
@@ -137,10 +142,6 @@ size_t set_up_events_to_watch(struct kevent *events, size_t number_of_files, cha
 			create_event_descriptor(filename));
 		event_slot++;
 	}
-
-	if (pledge("stdio", NULL) == -1)
-		err(7, "pledge");
-
 	return event_slot;
 }
 
