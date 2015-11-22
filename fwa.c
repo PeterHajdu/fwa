@@ -72,14 +72,14 @@ int create_queue() {
 
 size_t parse_options(int argc, char* argv[]) {
 	size_t number_of_files = argc - 1;
+	if (pledge("stdio rpath", NULL) == -1)
+		err(6, "pledge");
 	if (argc < 2)
 		usage();
 	if (0 == strncmp(argv[1], "-h", 2) || 0 == strncmp(argv[1], "--help", 6))
 		usage();
 	if (number_of_files < 1)
 		usage();
-	if (pledge("stdio rpath", NULL) == -1)
-		err(6, "pledge");
 	return number_of_files;
 }
 
