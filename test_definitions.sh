@@ -32,6 +32,18 @@ test_that_it_prints_out_usage_information_without_files_to_watch () {
 	return $?
 }
 
+test_that_it_prints_out_usage_information_if_the_dash_h_option_is_passed_in () {
+	run_with_parameters "-h"
+	grep -i usage $output_file
+	return $?
+}
+
+test_that_it_prints_out_usage_information_if_the_help_option_is_passed_in () {
+	run_with_parameters "--help"
+	grep -i usage $output_file
+	return $?
+}
+
 test_that_it_prints_out_a_single_files_name_if_it_is_changed () {
 	changed_file=`mktemp` || exit 1
 	unchanged_file=`mktemp` || exit 1

@@ -5,17 +5,18 @@
 #include <sys/event.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <string.h>
 
 void usage();
 int create_queue();
-size_t get_number_of_files();
+size_t parse_options(int, char*[]);
 struct kevent* allocate_event_memory(size_t);
-size_t set_up_events_to_watch( struct kevent *, size_t, char*[] );
+size_t set_up_events_to_watch(struct kevent *, size_t, char*[]);
 void set_output_buffer();
-void handle_events( int, struct kevent*, size_t );
+void handle_events(int, struct kevent*, size_t);
 
-int main(int argc, char *argv[]) {
-	const size_t number_of_files = get_number_of_files(argc);
+int main(int argc, char **argv) {
+	const size_t number_of_files = parse_options(argc, argv);
 	const int queue = create_queue();
 	struct kevent *events_to_monitor = allocate_event_memory(
 			number_of_files );
@@ -29,7 +30,10 @@ int main(int argc, char *argv[]) {
 }
 
 void usage() {
-	printf("usage: fwa <list of files to watch>\n");
+	printf(
+		"usage: fwa [options] <list of files to watch>\n"
+		"\noptions:\n"
+		"\t-h --help\tPrint out this message.\n");
 	exit(1);
 }
 
@@ -40,8 +44,12 @@ int create_queue() {
 	return queue;
 }
 
-size_t get_number_of_files(int argc) {
-	const size_t number_of_files = argc - 1;
+size_t parse_options(int argc, char* argv[]) {
+	size_t number_of_files = argc - 1;
+	if (argc < 2)
+		usage();
+	if (0 == strncmp(argv[1], "-h", 2) || 0 == strncmp(argv[1], "--help", 6))
+		usage();
 	if (number_of_files < 1)
 		usage();
 	return number_of_files;
