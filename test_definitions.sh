@@ -97,3 +97,20 @@ test_that_it_prints_out_fast_file_changes_only_once () {
 	return 1
 }
 
+test_that_it_continues_to_watch_files_after_deletion_and_recreation () {
+	file=`mktemp` || exit 1
+	run_with_parameters_in_the_background "$file"
+	rm -f $file
+	touch $file
+	sleep 1
+	touch $file
+	sleep 1
+	number_of_changes=`grep $file $output_file | wc -l`
+	echo "Number of changes: $number_of_changes"
+	if [ $number_of_changes -lt 2 ]; then
+		return 1
+	fi
+
+	return 0
+}
+

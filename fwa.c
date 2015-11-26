@@ -32,6 +32,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <string.h>
+#include <time.h>
 
 void usage();
 size_t parse_options(int, char*[]);
@@ -51,9 +52,6 @@ int main(int argc, char **argv) {
 	number_of_files = parse_options(argc, argv);
 	events_to_monitor = allocate_event_memory(number_of_files);
 	number_of_files = set_up_events_to_watch(events_to_monitor, number_of_files, argv);
-
-	if (pledge("stdio", NULL) == -1)
-		err(7, "pledge");
 
 	handle_events(events_to_monitor, number_of_files);
 	return 0;
@@ -90,7 +88,7 @@ struct kevent* allocate_event_memory(size_t number_of_files) {
 
 struct event_descriptor {
 	const char* filename;
-	int numbers_triggered;
+	unsigned int flags;
 };
 
 struct event_descriptor* create_event_descriptor(const char* filename) {
@@ -98,12 +96,13 @@ struct event_descriptor* create_event_descriptor(const char* filename) {
 	if (descriptor == NULL)
 		err(4, "Unable to allocate memory for descriptor.");
 	descriptor->filename=filename;
-	descriptor->numbers_triggered=0;
+	descriptor->flags=0;
 	return descriptor;
 }
 
-void mark_event(struct event_descriptor* descriptor) {
-	descriptor->numbers_triggered++;
+void mark_event(struct kevent* event) {
+	struct event_descriptor* descriptor = event->udata;
+	descriptor->flags|=event->fflags;
 }
 
 size_t set_up_events_to_watch(struct kevent *events, size_t number_of_files, char* argv[]) {
@@ -140,16 +139,44 @@ void set_output_buffer() {
   setvbuf(stdout, line_buffer, _IOLBF, sizeof(line_buffer));
 }
 
+int try_to_open_file(const char* filename){
+	int i;
+	struct timespec delay;
+	delay.tv_sec=0;
+	delay.tv_nsec=100000000;
+	for (i=0; i<10; ++i) {
+		const int fd = open(filename, O_RDONLY);
+		if (fd!=-1)
+			return fd;
+		nanosleep(&delay, NULL);
+	}
+
+	return -1;
+}
+
+void fix_descriptor_if_deleted(struct kevent* event){
+	static const unsigned int delete_events = NOTE_DELETE | NOTE_RENAME | NOTE_REVOKE;
+	struct event_descriptor* descriptor = event->udata;
+	if (!(descriptor->flags&delete_events))
+		return;
+	if (-1==close(event->ident))
+		warn("Unable to close file.");
+	event->ident = try_to_open_file(descriptor->filename);
+	if (-1==event->ident)
+		event->flags = EV_DELETE;
+}
+
 void report_and_cleanup_events(struct kevent* monitored_events, size_t number_of_events) {
 	size_t i = 0;
 	for(; i < number_of_events; i++)
 	{
 		struct event_descriptor* descriptor =
 			monitored_events[i].udata;
-		if (descriptor->numbers_triggered == 0)
+		if (descriptor->flags == 0)
 			continue;
 		printf("%s\n", descriptor->filename);
-		descriptor->numbers_triggered = 0;
+		fix_descriptor_if_deleted(&monitored_events[i]);
+		descriptor->flags = 0;
 	}
 }
 
@@ -177,7 +204,7 @@ void handle_events(struct kevent* events_to_monitor, size_t number_of_events) {
 		if(event_count < 0)
 			err(3, "Error occured while waiting for events.");
 		if(event_count > 0) {
-			mark_event(event_data[0].udata);
+			mark_event(event_data);
 			continue;
 		}
 
