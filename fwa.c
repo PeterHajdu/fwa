@@ -35,13 +35,15 @@
 #include <time.h>
 
 void usage();
+int create_queue();
 size_t parse_options(int, char*[]);
 struct kevent* allocate_event_memory(size_t);
-size_t set_up_events_to_watch(struct kevent *, size_t, char*[]);
+size_t set_up_events_to_watch(int, struct kevent *, size_t, char*[]);
 void set_output_buffer();
-void handle_events(struct kevent*, size_t);
+void handle_events(int, struct kevent*, size_t);
 
 int main(int argc, char **argv) {
+	int queue = create_queue();
 	size_t number_of_files = 0;
 	struct kevent *events_to_monitor = NULL;
 
@@ -51,9 +53,9 @@ int main(int argc, char **argv) {
 	set_output_buffer();
 	number_of_files = parse_options(argc, argv);
 	events_to_monitor = allocate_event_memory(number_of_files);
-	number_of_files = set_up_events_to_watch(events_to_monitor, number_of_files, argv);
+	number_of_files = set_up_events_to_watch(queue, events_to_monitor, number_of_files, argv);
 
-	handle_events(events_to_monitor, number_of_files);
+	handle_events(queue, events_to_monitor, number_of_files);
 	return 0;
 }
 
@@ -105,15 +107,22 @@ void mark_event(struct kevent* event) {
 	descriptor->flags|=event->fflags;
 }
 
-size_t set_up_events_to_watch(struct kevent *events, size_t number_of_files, char* argv[]) {
-	const unsigned int vnode_events =
-		NOTE_DELETE |
-		NOTE_WRITE |
-		NOTE_EXTEND |
-		NOTE_ATTRIB |
-		NOTE_LINK |
-		NOTE_RENAME |
-		NOTE_REVOKE;
+static const unsigned int monitored_events_mask =
+	NOTE_DELETE |
+	NOTE_WRITE |
+	NOTE_EXTEND |
+	NOTE_ATTRIB |
+	NOTE_LINK |
+	NOTE_RENAME |
+	NOTE_REVOKE;
+
+static const unsigned short clear_and_add = EV_ADD | EV_CLEAR;
+
+size_t set_up_events_to_watch(
+		int queue,
+		struct kevent *events,
+		size_t number_of_files,
+		char* argv[]) {
 	int i = 0;
 	int event_slot = 0;
 	for(; i < number_of_files; i++) {
@@ -125,10 +134,18 @@ size_t set_up_events_to_watch(struct kevent *events, size_t number_of_files, cha
 			&events[event_slot],
 			event_fd,
 			EVFILT_VNODE,
-			EV_ADD | EV_CLEAR,
-			vnode_events,
+			clear_and_add,
+			monitored_events_mask,
 			0,
 			create_event_descriptor(filename));
+		if (-1 == kevent(
+			queue,
+			&events[event_slot],
+			1,
+			NULL,
+			0,
+			NULL)) {
+		}
 		event_slot++;
 	}
 	return event_slot;
@@ -154,19 +171,50 @@ int try_to_open_file(const char* filename){
 	return -1;
 }
 
-void fix_descriptor_if_deleted(struct kevent* event){
-	static const unsigned int delete_events = NOTE_DELETE | NOTE_RENAME | NOTE_REVOKE;
-	struct event_descriptor* descriptor = event->udata;
-	if (!(descriptor->flags&delete_events))
-		return;
-	if (-1==close(event->ident))
-		warn("Unable to close file.");
-	event->ident = try_to_open_file(descriptor->filename);
-	if (-1==event->ident)
-		event->flags = EV_DELETE;
+
+int is_delete_event(struct event_descriptor* descriptor) {
+	const unsigned int delete_events =
+		NOTE_DELETE |
+		NOTE_RENAME |
+		NOTE_REVOKE;
+	return descriptor->flags & delete_events;
 }
 
-void report_and_cleanup_events(struct kevent* monitored_events, size_t number_of_events) {
+
+void fix_descriptor_if_deleted(int queue, struct kevent* event){
+	int fd = event->ident;
+	struct event_descriptor* descriptor = event->udata;
+
+	if (!is_delete_event(descriptor))
+		return;
+	if (-1 == close(event->ident))
+		warn("Unable to close file.");
+	fd = try_to_open_file(descriptor->filename);
+	if (-1 == fd)
+		return;
+
+	EV_SET(
+		event,
+		fd,
+		EVFILT_VNODE,
+		clear_and_add,
+		monitored_events_mask,
+		0,
+		event->udata);
+	if (-1 == kevent(
+		queue,
+		event,
+		1,
+		NULL,
+		0,
+		NULL))
+		warn("Unable to reenable event on file.");
+}
+
+void report_and_cleanup_events(
+		int queue,
+		struct kevent* monitored_events,
+		size_t number_of_events) {
 	size_t i = 0;
 	for(; i < number_of_events; i++)
 	{
@@ -175,7 +223,7 @@ void report_and_cleanup_events(struct kevent* monitored_events, size_t number_of
 		if (descriptor->flags == 0)
 			continue;
 		printf("%s\n", descriptor->filename);
-		fix_descriptor_if_deleted(&monitored_events[i]);
+		fix_descriptor_if_deleted(queue, &monitored_events[i]);
 		descriptor->flags = 0;
 	}
 }
@@ -187,8 +235,7 @@ int create_queue() {
 	return queue;
 }
 
-void handle_events(struct kevent* events_to_monitor, size_t number_of_events) {
-	int queue = create_queue();
+void handle_events(int queue, struct kevent* events_to_monitor, size_t number_of_events) {
 	struct kevent event_data[1];
 	struct timespec timeout;
 	timeout.tv_sec=0;
@@ -196,8 +243,8 @@ void handle_events(struct kevent* events_to_monitor, size_t number_of_events) {
 	while (1) {
 		int event_count = kevent(
 				queue,
-				events_to_monitor,
-				number_of_events,
+				NULL,
+				0,
 				event_data,
 				1,
 				&timeout);
@@ -208,7 +255,7 @@ void handle_events(struct kevent* events_to_monitor, size_t number_of_events) {
 			continue;
 		}
 
-		report_and_cleanup_events(events_to_monitor, number_of_events);
+		report_and_cleanup_events(queue, events_to_monitor, number_of_events);
 	}
 }
 

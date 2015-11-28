@@ -52,7 +52,6 @@ test_that_it_prints_out_a_single_files_name_if_it_is_changed () {
 	sleep 1
 	kill_background_fwa
 	if grep $unchanged_file $output_file; then
-		echo "unchanged file was printed"
 		return 1
 	fi
 
@@ -60,7 +59,6 @@ test_that_it_prints_out_a_single_files_name_if_it_is_changed () {
 		return 0
 	fi
 
-	echo "changed file was not printed"
 	return 1
 }
 
@@ -76,7 +74,6 @@ test_that_it_prints_out_each_changed_files_name () {
 		return 0
 	fi
 
-	echo "changed file was not printed"
 	return 1
 }
 
@@ -88,12 +85,10 @@ test_that_it_prints_out_fast_file_changes_only_once () {
 	sleep 1
 	kill_background_fwa
 	number_of_changes=`grep $file_1 $output_file | wc -l`
-	echo "Number of changes: $number_of_changes"
 	if [ $number_of_changes -lt 2 ]; then
 		return 0
 	fi
 
-	echo "Changed file was reported more than once."
 	return 1
 }
 
@@ -106,8 +101,23 @@ test_that_it_continues_to_watch_files_after_deletion_and_recreation () {
 	touch $file
 	sleep 1
 	number_of_changes=`grep $file $output_file | wc -l`
-	echo "Number of changes: $number_of_changes"
 	if [ $number_of_changes -lt 2 ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+test_that_it_continues_to_watch_files_after_deletion () {
+	file_1=`mktemp` || exit 1
+	file_2=`mktemp` || exit 1
+	run_with_parameters_in_the_background "$file_1 $file_2"
+	rm -f $file_1
+	sleep 2
+	touch $file_2
+	sleep 1
+	number_of_changes=`grep $file_2 $output_file | wc -l`
+	if [ $number_of_changes -lt 1 ]; then
 		return 1
 	fi
 
