@@ -118,44 +118,6 @@ static const unsigned int monitored_events_mask =
 
 static const unsigned short clear_and_add = EV_ADD | EV_CLEAR;
 
-size_t set_up_events_to_watch(
-		int queue,
-		struct kevent *events,
-		size_t number_of_files,
-		char* argv[]) {
-	int i = 0;
-	int event_slot = 0;
-	for(; i < number_of_files; i++) {
-		char* const filename = argv[i+1];
-		const int event_fd = open(filename, O_RDONLY);
-		if (event_fd<0)
-			err(5, "Unable to open file: %s", filename);
-		EV_SET(
-			&events[event_slot],
-			event_fd,
-			EVFILT_VNODE,
-			clear_and_add,
-			monitored_events_mask,
-			0,
-			create_event_descriptor(filename));
-		if (-1 == kevent(
-			queue,
-			&events[event_slot],
-			1,
-			NULL,
-			0,
-			NULL)) {
-		}
-		event_slot++;
-	}
-	return event_slot;
-}
-
-void set_output_buffer() {
-  static char line_buffer[512];
-  setvbuf(stdout, line_buffer, _IOLBF, sizeof(line_buffer));
-}
-
 int try_to_open_file(const char* filename){
 	int i;
 	struct timespec delay;
@@ -171,6 +133,37 @@ int try_to_open_file(const char* filename){
 	return -1;
 }
 
+size_t set_up_events_to_watch(
+		int queue,
+		struct kevent *events,
+		size_t number_of_files,
+		char* argv[]) {
+	int i = 0;
+	int event_slot = 0;
+	for(; i < number_of_files; i++) {
+		char* const filename = argv[i+1];
+		const int event_fd = try_to_open_file(filename);
+		if (event_fd<0)
+			err(5, "Unable to open file: %s", filename);
+		EV_SET(
+			&events[event_slot],
+			event_fd,
+			EVFILT_VNODE,
+			clear_and_add,
+			monitored_events_mask,
+			0,
+			create_event_descriptor(filename));
+		if (-1 == kevent( queue, &events[event_slot], 1, NULL, 0, NULL))
+			err(7, "Unable to register event filter for file: %s", filename);
+		event_slot++;
+	}
+	return event_slot;
+}
+
+void set_output_buffer() {
+  static char line_buffer[512];
+  setvbuf(stdout, line_buffer, _IOLBF, sizeof(line_buffer));
+}
 
 int is_delete_event(struct event_descriptor* descriptor) {
 	const unsigned int delete_events =
@@ -187,7 +180,7 @@ void fix_descriptor_if_deleted(int queue, struct kevent* event){
 
 	if (!is_delete_event(descriptor))
 		return;
-	if (-1 == close(event->ident))
+	if (-1 == close(fd))
 		warn("Unable to close file.");
 	fd = try_to_open_file(descriptor->filename);
 	if (-1 == fd)
@@ -201,13 +194,7 @@ void fix_descriptor_if_deleted(int queue, struct kevent* event){
 		monitored_events_mask,
 		0,
 		event->udata);
-	if (-1 == kevent(
-		queue,
-		event,
-		1,
-		NULL,
-		0,
-		NULL))
+	if (-1 == kevent( queue, event, 1, NULL, 0, NULL))
 		warn("Unable to reenable event on file.");
 }
 
@@ -218,8 +205,7 @@ void report_and_cleanup_events(
 	size_t i = 0;
 	for(; i < number_of_events; i++)
 	{
-		struct event_descriptor* descriptor =
-			monitored_events[i].udata;
+		struct event_descriptor* descriptor = monitored_events[i].udata;
 		if (descriptor->flags == 0)
 			continue;
 		printf("%s\n", descriptor->filename);
@@ -236,7 +222,7 @@ int create_queue() {
 }
 
 void handle_events(int queue, struct kevent* events_to_monitor, size_t number_of_events) {
-	struct kevent event_data[1];
+	struct kevent event_data;
 	struct timespec timeout;
 	timeout.tv_sec=0;
 	timeout.tv_nsec=500000000;
@@ -245,13 +231,13 @@ void handle_events(int queue, struct kevent* events_to_monitor, size_t number_of
 				queue,
 				NULL,
 				0,
-				event_data,
+				&event_data,
 				1,
 				&timeout);
 		if(event_count < 0)
 			err(3, "Error occured while waiting for events.");
 		if(event_count > 0) {
-			mark_event(event_data);
+			mark_event(&event_data);
 			continue;
 		}
 
