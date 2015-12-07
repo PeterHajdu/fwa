@@ -1,18 +1,16 @@
 #!/bin/sh
 
 output_file="./_test_output"
-fwa_pid=0
 
 run_with_parameters_in_the_background () {
 	echo "./fwa $* > $output_file"
 	./fwa $* > $output_file &
-	fwa_pid=$!
 	sleep 1
 	return 0
 }
 
 kill_background_fwa () {
-	kill $fwa_pid
+	pkill fwa
 }
 
 run_with_parameters () {
@@ -100,6 +98,7 @@ test_that_it_continues_to_watch_files_after_deletion_and_recreation () {
 	sleep 1
 	touch $file
 	sleep 1
+	kill_background_fwa
 	number_of_changes=`grep $file $output_file | wc -l`
 	if [ $number_of_changes -lt 2 ]; then
 		return 1
@@ -116,6 +115,7 @@ test_that_it_continues_to_watch_files_after_deletion () {
 	sleep 2
 	touch $file_2
 	sleep 1
+	kill_background_fwa
 	number_of_changes=`grep $file_2 $output_file | wc -l`
 	if [ $number_of_changes -lt 1 ]; then
 		return 1
