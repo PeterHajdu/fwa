@@ -9,7 +9,7 @@ $(EXECUTABLE): $(SOURCES)
 	$(CC) $(CFLAGS) $(SOURCES) -o $(EXECUTABLE)
 
 test: $(EXECUTABLE) $(TEST)
-	$(TEST)
+	sh $(TEST)
 
 install: $(EXECUTABLE)
 	@mkdir -p ${DESTDIR}${PREFIX}/bin
