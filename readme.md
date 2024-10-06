@@ -25,7 +25,7 @@ fwa * | while read; do make test; done
 ## Execute commands specific for a file type
 
 ```sh
-fwa * | while read; do handle; done
+fwa * | while true; do handle; done
 ```
 
 Where handle might look like this.
